@@ -50,7 +50,6 @@
         .btn-roppongi { background-color: var(--roppongi-color); }
         .btn-azabu { background-color: var(--azabu-color); }
 
-        /* 詳細パネル：コンパクト化 */
         #detail-panel {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: white; padding: 20px; border-radius: 20px 20px 0 0;
@@ -77,7 +76,6 @@
         }
         .point-list { padding-left: 20px; margin: 10px 0; line-height: 1.5; font-size: 0.95rem; }
 
-        /* 写真表示ボタンのスタイル */
         .btn-view-photo {
             width: 100%; padding: 10px; margin-bottom: 10px;
             background-color: #34495e; color: white;
@@ -85,7 +83,6 @@
             display: none; cursor: pointer;
         }
 
-        /* 写真モーダル（全画面オーバーレイ） */
         #photo-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); display: none;
@@ -120,7 +117,7 @@
 
 <div id="loading">
     <div class="spinner"></div>
-    <p>通信中...</p>
+    <p>最新の配置データを取得中...</p>
 </div>
 
 <header>
@@ -170,11 +167,11 @@
     let locations = [];
     let selectedLocation = null;
     let activePin = null;
-    let currentPhotoUrl = ""; // モーダル表示用にURLを保持
+    let currentPhotoUrl = "";
 
     async function init() {
         initMap();
-        await fetchData();
+        await fetchData(); // 初回のみ通信待ちをする
     }
 
     function initMap() {
@@ -191,7 +188,7 @@
             locations = await response.json();
             renderMarkers();
         } catch (error) {
-            alert('データの取得に失敗しました。');
+            console.error(error);
         } finally {
             showLoading(false);
         }
@@ -264,15 +261,19 @@
             }
         });
 
-        // 写真URLの処理
+        // ★写真URLの処理（GitHub上の画像ファイル名に対応）
         const photoBtn = document.getElementById('view-photo-btn');
         let photoUrl = String(loc['写真URL'] || '').trim();
-        if (photoUrl.startsWith('http')) {
-            // Googleドライブの変換
-            const driveMatch = photoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-            if (driveMatch && driveMatch[1]) {
-                photoUrl = `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+        
+        if (photoUrl) {
+            if (photoUrl.startsWith('http')) {
+                // Googleドライブ等へのフルリンクの場合
+                const driveMatch = photoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                if (driveMatch && driveMatch[1]) {
+                    photoUrl = `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+                }
             }
+            // URLが入っていれば（ファイル名だけでも）ボタンを表示
             currentPhotoUrl = photoUrl;
             photoBtn.style.display = 'block';
         } else {
@@ -285,7 +286,6 @@
         document.getElementById('detail-panel').classList.add('active');
     }
 
-    // 写真モーダルの開閉
     function openPhotoModal() {
         if (!currentPhotoUrl) return;
         document.getElementById('modal-img').src = currentPhotoUrl;
@@ -303,22 +303,29 @@
         if (activePin) { map.removeLayer(activePin); activePin = null; }
     }
 
-    async function updateStatus(action) {
+    // ★修正：楽観的UI更新（待ち時間ゼロで画面を切り替える）
+    function updateStatus(action) {
         if (!selectedLocation) return;
-        showLoading(true);
-        try {
-            await fetch(GAS_URL, {
-                method: 'POST', mode: 'no-cors',
-                body: JSON.stringify({ action: action, id: selectedLocation['ID'], area: selectedLocation['エリア'], name: selectedLocation['名称'] })
-            });
-            hideDetail();
-            await fetchData();
-        } catch (error) {
-            alert('通信エラーが発生しました。');
-            showLoading(false);
+        
+        const targetId = selectedLocation['ID'];
+        const payload = { action: action, id: targetId, area: selectedLocation['エリア'], name: selectedLocation['名称'] };
+
+        // 1. 通信を待たずに、手元のデータを書き換えて画面を即更新する（0秒）
+        const locIndex = locations.findIndex(l => l['ID'] === targetId);
+        if (locIndex !== -1) {
+            locations[locIndex]['状態'] = (action === 'assign') ? '配置済み' : '';
         }
+        hideDetail();     // パネルを閉じる
+        renderMarkers();  // マップのピン色を更新
+
+        // 2. 裏でこっそりスプレッドシートに送信（ローディング画面は出さない）
+        fetch(GAS_URL, {
+            method: 'POST', mode: 'no-cors',
+            body: JSON.stringify(payload)
+        }).catch(err => console.error('バックグラウンド保存エラー'));
     }
 
+    // 全クリアは念のためローディング画面を残す
     async function clearAllLocations() {
         if (!confirm('全員の配置状況をリセットしますか？')) return;
         showLoading(true);
