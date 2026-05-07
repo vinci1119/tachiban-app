@@ -293,8 +293,8 @@
         // ポイントのパース
         const pointsList = document.getElementById('p-points');
         pointsList.innerHTML = '';
-        const points = loc['注意点'].split(/[\n\r
-]/);
+        const points = loc['注意点'].split(/\r?\n/);
+        
         points.forEach(p => {
             if(p.trim()) {
                 const li = document.createElement('li');
