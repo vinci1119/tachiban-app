@@ -76,6 +76,18 @@
         }
         .point-list { padding-left: 20px; margin: 10px 0; line-height: 1.6; }
 
+        .photo-container {
+            width: 100%; height: 200px;
+            background: #eee; border-radius: 10px;
+            margin: 15px 0; display: flex;
+            align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .photo-container img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+
         .btn-confirm { background-color: var(--primary-color); width: 100%; margin-top: 10px; display: none; }
         .btn-cancel { background-color: #95a5a6; width: 100%; margin-top: 10px; display: none; }
 
@@ -127,18 +139,22 @@
     <h3>見守りのポイント</h3>
     <ul id="p-points" class="point-list"></ul>
 
+    <div id="p-photo" class="photo-container">
+        <p>写真なし</p>
+    </div>
+
     <button id="confirm-btn" class="action-btn btn-confirm" onclick="updateStatus('assign')">ここに立つ（確定）</button>
     <button id="cancel-btn" class="action-btn btn-cancel" onclick="updateStatus('cancel')">配置を解除する</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // ★前回のURLをそのまま使用しています
     const GAS_URL = "https://script.google.com/macros/s/AKfycbynymW6z6b9IKwzJtJ_YtGTjkCllhqaHaEgkUklFcBf0Eb7gosfC4hG2RVAiEVstbWC/exec";
     
     let map, markers = [];
     let locations = [];
     let selectedLocation = null;
+    let activePin = null; // ★追加：選択中の場所を示すピンアイコン用
 
     async function init() {
         initMap();
@@ -168,6 +184,12 @@
     function renderMarkers() {
         markers.forEach(m => map.removeLayer(m));
         markers = [];
+        
+        // データを再読み込みした際、古い選択ピンがあれば消す
+        if (activePin) {
+            map.removeLayer(activePin);
+            activePin = null;
+        }
 
         locations.forEach(loc => {
             if (!loc['緯度'] || !loc['経度']) return;
@@ -179,16 +201,14 @@
             let color, opacity;
 
             if (isAssigned) {
-                // 配置済みはグレーアウト
                 color = '#7f8c8d';
                 opacity = 0.8;
             } else {
-                // 未配置の場合、エリアで色を分け、優先度で濃淡（透明度）をつける
                 color = loc['エリア'] === '六本木方面' ? '#e74c3c' : '#2ecc71';
                 const priority = Number(loc['優先度']) || 3;
-                if (priority === 1) opacity = 1.0; // 濃い
-                else if (priority === 2) opacity = 0.6; // 中くらい
-                else opacity = 0.3; // 薄い
+                if (priority === 1) opacity = 1.0;
+                else if (priority === 2) opacity = 0.6;
+                else opacity = 0.3;
             }
 
             const marker = L.circleMarker([lat, lng], {
@@ -204,7 +224,6 @@
     }
 
     function assignRandomly(areaName) {
-        // まだ配置されていない場所だけを絞り込む
         const availableList = locations.filter(l => l['エリア'] === areaName && l['状態'] !== '配置済み');
         
         if (availableList.length === 0) {
@@ -213,7 +232,7 @@
         }
 
         const priorities = [...new Set(availableList.map(l => Number(l['優先度'])))].sort((a,b) => a - b);
-        const targetPriority = priorities[0]; // 最も高い優先度（数字が小さい）
+        const targetPriority = priorities[0];
         const candidates = availableList.filter(l => Number(l['優先度']) === targetPriority);
 
         const randomLoc = candidates[Math.floor(Math.random() * candidates.length)];
@@ -229,7 +248,6 @@
         
         const isAssigned = loc['状態'] === '配置済み';
         
-        // バッジとボタンの表示切り替え
         document.getElementById('p-status').style.display = isAssigned ? 'inline-block' : 'none';
         document.getElementById('confirm-btn').style.display = isAssigned ? 'none' : 'block';
         document.getElementById('cancel-btn').style.display = isAssigned ? 'block' : 'none';
@@ -245,12 +263,29 @@
             }
         });
 
+        const photoDiv = document.getElementById('p-photo');
+        if (loc['写真URL'] && String(loc['写真URL']).startsWith('http')) {
+            photoDiv.innerHTML = `<img src="${loc['写真URL']}" alt="現地写真">`;
+        } else {
+            photoDiv.innerHTML = '<p>写真なし</p>';
+        }
+
+        // ★選択中の場所に「青いピン」を重ねて表示
+        if (activePin) map.removeLayer(activePin);
+        activePin = L.marker([loc['緯度'], loc['経度']]).addTo(map);
+
         document.getElementById('detail-panel').classList.add('active');
     }
 
     function hideDetail() {
         document.getElementById('detail-panel').classList.remove('active');
         selectedLocation = null;
+        
+        // ★詳細パネルを閉じたらピンも消す
+        if (activePin) {
+            map.removeLayer(activePin);
+            activePin = null;
+        }
     }
 
     async function updateStatus(action) {
@@ -259,7 +294,7 @@
 
         try {
             const payload = {
-                action: action, // 'assign' or 'cancel'
+                action: action,
                 id: selectedLocation['ID'],
                 area: selectedLocation['エリア'],
                 name: selectedLocation['名称']
@@ -273,10 +308,9 @@
             });
 
             hideDetail();
-            // データを再取得してマップを更新
             await fetchData();
             
-            if(action === 'assign') alert('配置を記録しました。見守りよろしくお願いします！');
+            if(action === 'assign') alert('配置を記録しました。');
             else alert('配置を解除しました。');
 
         } catch (error) {
@@ -298,7 +332,7 @@
             });
 
             await fetchData();
-            alert('すべての配置状況をリセットしました。お疲れ様でした！');
+            alert('リセット完了。お疲れ様でした！');
         } catch (error) {
             alert('通信エラーが発生しました。');
             showLoading(false);
