@@ -50,16 +50,17 @@
         .btn-roppongi { background-color: var(--roppongi-color); }
         .btn-azabu { background-color: var(--azabu-color); }
 
+        /* 詳細パネル：コンパクト化 */
         #detail-panel {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: white; padding: 20px; border-radius: 20px 20px 0 0;
             box-shadow: 0 -5px 15px rgba(0,0,0,0.2);
             transform: translateY(100%); transition: transform 0.3s ease-out;
-            z-index: 2000; max-height: 80vh; overflow-y: auto;
+            z-index: 2000; max-height: 60vh; overflow-y: auto;
         }
         #detail-panel.active { transform: translateY(0); }
 
-        .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+        .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
         .close-btn {
             background: #eee; border: none; border-radius: 50%;
             width: 30px; height: 30px; cursor: pointer;
@@ -67,29 +68,41 @@
         }
         .priority-badge {
             display: inline-block; padding: 2px 8px; border-radius: 4px;
-            font-size: 0.8rem; background: #f1c40f; color: #000; margin-bottom: 5px;
+            font-size: 0.8rem; background: #f1c40f; color: #000;
         }
         .status-badge {
             display: inline-block; padding: 2px 8px; border-radius: 4px;
-            font-size: 0.8rem; margin-bottom: 5px; margin-left: 5px;
+            font-size: 0.8rem; margin-left: 5px;
             background: var(--assigned-color); color: white; display: none;
         }
-        .point-list { padding-left: 20px; margin: 10px 0; line-height: 1.6; }
+        .point-list { padding-left: 20px; margin: 10px 0; line-height: 1.5; font-size: 0.95rem; }
 
-        .photo-container {
-            width: 100%; height: 200px;
-            background: #eee; border-radius: 10px;
-            margin: 15px 0; display: flex;
+        /* 写真表示ボタンのスタイル */
+        .btn-view-photo {
+            width: 100%; padding: 10px; margin-bottom: 10px;
+            background-color: #34495e; color: white;
+            border: none; border-radius: 8px; font-weight: bold;
+            display: none; cursor: pointer;
+        }
+
+        /* 写真モーダル（全画面オーバーレイ） */
+        #photo-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none;
             align-items: center; justify-content: center;
-            overflow: hidden;
+            z-index: 3000; padding: 20px; backdrop-filter: blur(5px);
         }
-        .photo-container img {
-            width: 100%; height: 100%;
-            object-fit: cover;
+        #photo-modal img {
+            max-width: 100%; max-height: 85%;
+            border-radius: 10px; border: 2px solid #fff;
+        }
+        #photo-modal .modal-close {
+            position: absolute; top: 20px; right: 20px;
+            color: white; font-size: 35px; font-weight: bold; cursor: pointer;
         }
 
-        .btn-confirm { background-color: var(--primary-color); width: 100%; margin-top: 10px; display: none; }
-        .btn-cancel { background-color: #95a5a6; width: 100%; margin-top: 10px; display: none; }
+        .btn-confirm { background-color: var(--primary-color); width: 100%; margin-top: 5px; display: none; }
+        .btn-cancel { background-color: #95a5a6; width: 100%; margin-top: 5px; display: none; }
 
         #loading {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -122,29 +135,31 @@
         <button class="action-btn btn-roppongi" onclick="assignRandomly('六本木方面')">六本木方面<br><small>ランダム選択</small></button>
         <button class="action-btn btn-azabu" onclick="assignRandomly('麻布十番方面')">麻布十番方面<br><small>ランダム選択</small></button>
     </div>
-    <p style="margin:0; font-size:0.8rem; color:#666; text-align:center;">ピンをタップして手動で選ぶ・解除することもできます</p>
 </div>
 
 <div id="detail-panel">
     <div class="detail-header">
         <div>
-            <div id="p-area" style="font-size: 0.9rem; color: #666;"></div>
+            <div id="p-area" style="font-size: 0.85rem; color: #666; margin-bottom: 2px;"></div>
             <div id="p-priority" class="priority-badge"></div>
             <div id="p-status" class="status-badge">配置済み</div>
-            <h2 id="p-name" style="margin: 0;"></h2>
+            <h2 id="p-name" style="margin: 5px 0 0 0; font-size: 1.4rem;"></h2>
         </div>
         <button class="close-btn" onclick="hideDetail()">&times;</button>
     </div>
     
-    <h3>見守りのポイント</h3>
+    <p style="margin: 15px 0 5px 0; font-weight: bold; font-size: 0.9rem;">見守りのポイント</p>
     <ul id="p-points" class="point-list"></ul>
 
-    <div id="p-photo" class="photo-container">
-        <p>写真なし</p>
-    </div>
+    <button id="view-photo-btn" class="btn-view-photo" onclick="openPhotoModal()">📸 写真を確認する</button>
 
     <button id="confirm-btn" class="action-btn btn-confirm" onclick="updateStatus('assign')">ここに立つ（確定）</button>
     <button id="cancel-btn" class="action-btn btn-cancel" onclick="updateStatus('cancel')">配置を解除する</button>
+</div>
+
+<div id="photo-modal" onclick="closePhotoModal()">
+    <span class="modal-close">&times;</span>
+    <img id="modal-img" src="" alt="現地写真">
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -154,7 +169,8 @@
     let map, markers = [];
     let locations = [];
     let selectedLocation = null;
-    let activePin = null; // ★追加：選択中の場所を示すピンアイコン用
+    let activePin = null;
+    let currentPhotoUrl = ""; // モーダル表示用にURLを保持
 
     async function init() {
         initMap();
@@ -184,12 +200,7 @@
     function renderMarkers() {
         markers.forEach(m => map.removeLayer(m));
         markers = [];
-        
-        // データを再読み込みした際、古い選択ピンがあれば消す
-        if (activePin) {
-            map.removeLayer(activePin);
-            activePin = null;
-        }
+        if (activePin) { map.removeLayer(activePin); activePin = null; }
 
         locations.forEach(loc => {
             if (!loc['緯度'] || !loc['経度']) return;
@@ -201,8 +212,7 @@
             let color, opacity;
 
             if (isAssigned) {
-                color = '#7f8c8d';
-                opacity = 0.8;
+                color = '#7f8c8d'; opacity = 0.8;
             } else {
                 color = loc['エリア'] === '六本木方面' ? '#e74c3c' : '#2ecc71';
                 const priority = Number(loc['優先度']) || 3;
@@ -212,10 +222,7 @@
             }
 
             const marker = L.circleMarker([lat, lng], {
-                radius: 12,
-                fillColor: color,
-                color: "#fff", weight: 2,
-                opacity: 1, fillOpacity: opacity
+                radius: 12, fillColor: color, color: "#fff", weight: 2, opacity: 1, fillOpacity: opacity
             }).addTo(map);
 
             marker.on('click', () => showDetail(loc));
@@ -225,16 +232,13 @@
 
     function assignRandomly(areaName) {
         const availableList = locations.filter(l => l['エリア'] === areaName && l['状態'] !== '配置済み');
-        
         if (availableList.length === 0) {
-            alert(areaName + 'はすべて配置済みです！ありがとうございます。');
+            alert(areaName + 'はすべて配置済みです！');
             return;
         }
-
         const priorities = [...new Set(availableList.map(l => Number(l['優先度'])))].sort((a,b) => a - b);
         const targetPriority = priorities[0];
         const candidates = availableList.filter(l => Number(l['優先度']) === targetPriority);
-
         const randomLoc = candidates[Math.floor(Math.random() * candidates.length)];
         showDetail(randomLoc);
         map.flyTo([randomLoc['緯度'], randomLoc['経度']], 17);
@@ -247,7 +251,6 @@
         document.getElementById('p-priority').innerText = '優先度: ' + loc['優先度'];
         
         const isAssigned = loc['状態'] === '配置済み';
-        
         document.getElementById('p-status').style.display = isAssigned ? 'inline-block' : 'none';
         document.getElementById('confirm-btn').style.display = isAssigned ? 'none' : 'block';
         document.getElementById('cancel-btn').style.display = isAssigned ? 'block' : 'none';
@@ -257,72 +260,59 @@
         const points = loc['注意点'] ? String(loc['注意点']).split(/\r?\n/) : [];
         points.forEach(p => {
             if(p.trim()) {
-                const li = document.createElement('li');
-                li.innerText = p;
-                pointsList.appendChild(li);
+                const li = document.createElement('li'); li.innerText = p; pointsList.appendChild(li);
             }
         });
 
-        const photoDiv = document.getElementById('p-photo');
+        // 写真URLの処理
+        const photoBtn = document.getElementById('view-photo-btn');
         let photoUrl = String(loc['写真URL'] || '').trim();
-
         if (photoUrl.startsWith('http')) {
-            // Googleドライブの標準リンクを、画像直リンク(uc?id=...)に自動変換する処理
+            // Googleドライブの変換
             const driveMatch = photoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
             if (driveMatch && driveMatch[1]) {
                 photoUrl = `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
             }
-            // 読み込み中の表示が崩れないよう、画像の最大幅を指定
-            photoDiv.innerHTML = `<img src="${photoUrl}" alt="現地写真" style="max-width:100%; height:auto;">`;
+            currentPhotoUrl = photoUrl;
+            photoBtn.style.display = 'block';
         } else {
-            photoDiv.innerHTML = '<p>写真なし</p>';
+            currentPhotoUrl = "";
+            photoBtn.style.display = 'none';
         }
 
-
-
-        // ★選択中の場所に「青いピン」を重ねて表示
         if (activePin) map.removeLayer(activePin);
         activePin = L.marker([loc['緯度'], loc['経度']]).addTo(map);
-
         document.getElementById('detail-panel').classList.add('active');
+    }
+
+    // 写真モーダルの開閉
+    function openPhotoModal() {
+        if (!currentPhotoUrl) return;
+        document.getElementById('modal-img').src = currentPhotoUrl;
+        document.getElementById('photo-modal').style.display = 'flex';
+    }
+
+    function closePhotoModal() {
+        document.getElementById('photo-modal').style.display = 'none';
+        document.getElementById('modal-img').src = "";
     }
 
     function hideDetail() {
         document.getElementById('detail-panel').classList.remove('active');
         selectedLocation = null;
-        
-        // ★詳細パネルを閉じたらピンも消す
-        if (activePin) {
-            map.removeLayer(activePin);
-            activePin = null;
-        }
+        if (activePin) { map.removeLayer(activePin); activePin = null; }
     }
 
     async function updateStatus(action) {
         if (!selectedLocation) return;
         showLoading(true);
-
         try {
-            const payload = {
-                action: action,
-                id: selectedLocation['ID'],
-                area: selectedLocation['エリア'],
-                name: selectedLocation['名称']
-            };
-
             await fetch(GAS_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                method: 'POST', mode: 'no-cors',
+                body: JSON.stringify({ action: action, id: selectedLocation['ID'], area: selectedLocation['エリア'], name: selectedLocation['名称'] })
             });
-
             hideDetail();
             await fetchData();
-            
-            if(action === 'assign') alert('配置を記録しました。');
-            else alert('配置を解除しました。');
-
         } catch (error) {
             alert('通信エラーが発生しました。');
             showLoading(false);
@@ -330,28 +320,18 @@
     }
 
     async function clearAllLocations() {
-        if (!confirm('見守りが終了しましたか？\n全員の配置状況をリセットします。')) return;
+        if (!confirm('全員の配置状況をリセットしますか？')) return;
         showLoading(true);
-
         try {
-            await fetch(GAS_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'clearAll' })
-            });
-
+            await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'clearAll' }) });
             await fetchData();
-            alert('リセット完了。お疲れ様でした！');
         } catch (error) {
             alert('通信エラーが発生しました。');
             showLoading(false);
         }
     }
 
-    function showLoading(show) {
-        document.getElementById('loading').style.display = show ? 'flex' : 'none';
-    }
+    function showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
 
     window.onload = init;
 </script>
