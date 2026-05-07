@@ -50,7 +50,6 @@
         .btn-roppongi { background-color: var(--roppongi-color); }
         .btn-azabu { background-color: var(--azabu-color); }
 
-        /* 詳細パネル：コンパクト化 */
         #detail-panel {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: white; padding: 20px; border-radius: 20px 20px 0 0;
@@ -77,7 +76,6 @@
         }
         .point-list { padding-left: 20px; margin: 10px 0; line-height: 1.5; font-size: 0.95rem; }
 
-        /* 写真表示ボタンのスタイル */
         .btn-view-photo {
             width: 100%; padding: 10px; margin-bottom: 10px;
             background-color: #34495e; color: white;
@@ -85,7 +83,6 @@
             display: none; cursor: pointer;
         }
 
-        /* 写真モーダル（全画面オーバーレイ） */
         #photo-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); display: none;
@@ -135,7 +132,6 @@
         <button class="action-btn btn-roppongi" onclick="assignRandomly('六本木方面')">六本木方面<br><small>ランダム選択</small></button>
         <button class="action-btn btn-azabu" onclick="assignRandomly('麻布十番方面')">麻布十番方面<br><small>ランダム選択</small></button>
     </div>
-    <p style="margin:0; font-size:0.8rem; color:#666; text-align:center;">ピンをタップして手動で選ぶ・解除することもできます</p>
 </div>
 
 <div id="detail-panel">
@@ -175,12 +171,15 @@
 
     async function init() {
         initMap();
-        await fetchData(); // 初回のみ通信待ちをする
+        await fetchData();
     }
 
     function initMap() {
-        map = L.map('map').setView([35.6585, 139.7335], 15);
+        // 初期中心座標とズームレベルを維持
+        map = L.map('map').setView([35.660982585197516, 139.73403123876028], 17);
+        
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
     }
@@ -211,19 +210,25 @@
 
             const isAssigned = loc['状態'] === '配置済み';
             let color, opacity;
+            const radiusSize = 12; // ★サイズを12pxに固定（元に戻しました）
 
             if (isAssigned) {
-                color = '#7f8c8d'; opacity = 0.8;
+                color = '#7f8c8d'; 
+                opacity = 0.8;
             } else {
                 color = loc['エリア'] === '六本木方面' ? '#e74c3c' : '#2ecc71';
                 const priority = Number(loc['優先度']) || 3;
+                
+                // 濃淡（透明度）だけ残して優先度を表現
                 if (priority === 1) opacity = 1.0;
-                else if (priority === 2) opacity = 0.6;
-                else opacity = 0.3;
+                else if (priority === 2) opacity = 0.7;
+                else opacity = 0.4;
             }
 
             const marker = L.circleMarker([lat, lng], {
-                radius: 12, fillColor: color, color: "#fff", weight: 2, opacity: 1, fillOpacity: opacity
+                radius: radiusSize, 
+                fillColor: color, 
+                color: "#fff", weight: 2, opacity: 1, fillOpacity: opacity
             }).addTo(map);
 
             marker.on('click', () => showDetail(loc));
@@ -242,7 +247,7 @@
         const candidates = availableList.filter(l => Number(l['優先度']) === targetPriority);
         const randomLoc = candidates[Math.floor(Math.random() * candidates.length)];
         showDetail(randomLoc);
-        map.flyTo([randomLoc['緯度'], randomLoc['経度']], 17);
+        map.flyTo([randomLoc['緯度'], randomLoc['経度']], 18);
     }
 
     function showDetail(loc) {
@@ -265,14 +270,11 @@
             }
         });
 
-        // ★修正：写真URLの処理（GitHubのファイル名にも対応）
         const photoBtn = document.getElementById('view-photo-btn');
         let photoUrl = String(loc['写真URL'] || '').trim();
         
-        if (photoUrl !== "") {
-            // 文字列が入っている場合はボタンを表示
+        if (photoUrl) {
             if (photoUrl.startsWith('http')) {
-                // Googleドライブのリンクの場合は自動変換
                 const driveMatch = photoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
                 if (driveMatch && driveMatch[1]) {
                     photoUrl = `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
@@ -281,7 +283,6 @@
             currentPhotoUrl = photoUrl;
             photoBtn.style.display = 'block';
         } else {
-            // 空欄の場合はボタンを隠す
             currentPhotoUrl = "";
             photoBtn.style.display = 'none';
         }
@@ -308,22 +309,18 @@
         if (activePin) { map.removeLayer(activePin); activePin = null; }
     }
 
-    // ★追加：通信待ちをなくす「楽観的UI」ロジック
     function updateStatus(action) {
         if (!selectedLocation) return;
-        
         const targetId = selectedLocation['ID'];
         const payload = { action: action, id: targetId, area: selectedLocation['エリア'], name: selectedLocation['名称'] };
 
-        // 1. 通信を待たずに、手元のデータを書き換えて画面を即更新する（0秒）
         const locIndex = locations.findIndex(l => l['ID'] === targetId);
         if (locIndex !== -1) {
             locations[locIndex]['状態'] = (action === 'assign') ? '配置済み' : '';
         }
-        hideDetail();     // パネルを閉じる
-        renderMarkers();  // マップのピン色を即座に更新
+        hideDetail();
+        renderMarkers();
 
-        // 2. 裏でこっそりスプレッドシートに送信（ローディング画面は出さない）
         fetch(GAS_URL, {
             method: 'POST', mode: 'no-cors',
             body: JSON.stringify(payload)
