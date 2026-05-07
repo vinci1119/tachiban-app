@@ -244,8 +244,14 @@
         markers = [];
 
         locations.forEach(loc => {
+            // ★追加：緯度・経度が空欄の行、または不正なデータの場合はスキップしてエラーを防ぐ
+            if (!loc['緯度'] || !loc['経度']) return;
+            const lat = parseFloat(loc['緯度']);
+            const lng = parseFloat(loc['経度']);
+            if (isNaN(lat) || isNaN(lng)) return;
+
             const color = loc['エリア'] === '六本木方面' ? '#e74c3c' : '#2ecc71';
-            const marker = L.circleMarker([loc['緯度'], loc['経度']], {
+            const marker = L.circleMarker([lat, lng], {
                 radius: 10,
                 fillColor: color,
                 color: "#fff",
