@@ -1,0 +1,353 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>朝の見守り配置システム</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --roppongi-color: #e74c3c;
+            --azabu-color: #2ecc71;
+            --bg-color: #f8f9fa;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background: #fff;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+            z-index: 1000;
+        }
+        h1 { margin: 0; font-size: 1.2rem; }
+        
+        #map {
+            flex-grow: 1;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .controls {
+            padding: 15px;
+            background: #fff;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:active { opacity: 0.7; }
+
+        .btn-roppongi { background-color: var(--roppongi-color); }
+        .btn-azabu { background-color: var(--azabu-color); }
+        .btn-confirm { background-color: var(--primary-color); width: 100%; margin-top: 10px; display: none; }
+
+        #detail-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 20px;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.2);
+            transform: translateY(100%);
+            transition: transform 0.3s ease-out;
+            z-index: 2000;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #detail-panel.active {
+            transform: translateY(0);
+        }
+
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .close-btn {
+            background: #eee;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .priority-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            background: #f1c40f;
+            color: #000;
+            margin-bottom: 5px;
+        }
+
+        .point-list {
+            padding-left: 20px;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+
+        .photo-container {
+            width: 100%;
+            height: 200px;
+            background: #eee;
+            border-radius: 10px;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .photo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Loading Spinner */
+        #loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <div class="spinner"></div>
+    <p>データを読み込み中...</p>
+</div>
+
+<header>
+    <h1>朝の見守り配置</h1>
+</header>
+
+<div id="map"></div>
+
+<div class="controls">
+    <div class="btn-group">
+        <button class="btn-roppongi" onclick="assignRandomly('六本木方面')">六本木方面<br><small>ランダム選択</small></button>
+        <button class="btn-azabu" onclick="assignRandomly('麻布十番方面')">麻布十番方面<br><small>ランダム選択</small></button>
+    </div>
+    <p style="margin:0; font-size:0.8rem; color:#666; text-align:center;">ピンを直接タップして手動で選ぶこともできます</p>
+</div>
+
+<div id="detail-panel">
+    <div class="detail-header">
+        <div>
+            <div id="p-area" style="font-size: 0.9rem; color: #666;"></div>
+            <div id="p-priority" class="priority-badge"></div>
+            <h2 id="p-name" style="margin: 0;"></h2>
+        </div>
+        <button class="close-btn" onclick="hideDetail()">&times;</button>
+    </div>
+    
+    <h3>見守りのポイント</h3>
+    <ul id="p-points" class="point-list"></ul>
+    
+    <div id="p-photo" class="photo-container">
+        <p>写真なし</p>
+    </div>
+
+    <button id="confirm-btn" class="btn-confirm" onclick="confirmLocation()">ここに立つ（確定）</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbynymW6z6b9IKwzJtJ_YtGTjkCllhqaHaEgkUklFcBf0Eb7gosfC4hG2RVAiEVstbWC/exec";
+    
+    let map, markers = [];
+    let locations = [];
+    let selectedLocation = null;
+
+    // 初期化
+    async function init() {
+        initMap();
+        await fetchData();
+        document.getElementById('loading').style.display = 'none';
+    }
+
+    function initMap() {
+        map = L.map('map').setView([35.6585, 139.7335], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+    }
+
+    async function fetchData() {
+        try {
+            const response = await fetch(GAS_URL);
+            locations = await response.json();
+            renderMarkers();
+        } catch (error) {
+            alert('データの取得に失敗しました。');
+            console.error(error);
+        }
+    }
+
+    function renderMarkers() {
+        markers.forEach(m => map.removeLayer(m));
+        markers = [];
+
+        locations.forEach(loc => {
+            const color = loc['エリア'] === '六本木方面' ? '#e74c3c' : '#2ecc71';
+            const marker = L.circleMarker([loc['緯度'], loc['経度']], {
+                radius: 10,
+                fillColor: color,
+                color: "#fff",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+
+            marker.on('click', () => showDetail(loc));
+            markers.push(marker);
+        });
+    }
+
+    function assignRandomly(areaName) {
+        const areaList = locations.filter(l => l['エリア'] === areaName);
+        if (areaList.length === 0) return;
+
+        // 優先度(数値が小さいほど高い)でグループ化
+        const priorities = [...new Set(areaList.map(l => Number(l['優先度'])))].sort((a,b) => a - b);
+        
+        // 最も高い優先度レベルのリストを取得
+        // ※本来は「まだ誰もいない場所」をフィルタリングすべきだが、現状はマスターデータからランダム
+        const targetPriority = priorities[0];
+        const candidates = areaList.filter(l => Number(l['優先度']) === targetPriority);
+
+        const randomLoc = candidates[Math.floor(Math.random() * candidates.length)];
+        showDetail(randomLoc);
+        
+        // マップを移動
+        map.flyTo([randomLoc['緯度'], randomLoc['経度']], 17);
+    }
+
+    function showDetail(loc) {
+        selectedLocation = loc;
+        document.getElementById('p-name').innerText = loc['名称'];
+        document.getElementById('p-area').innerText = loc['エリア'];
+        document.getElementById('p-priority').innerText = '優先度: ' + loc['優先度'];
+        
+        // ポイントのパース
+        const pointsList = document.getElementById('p-points');
+        pointsList.innerHTML = '';
+        const points = loc['注意点'].split(/[\n\r
+]/);
+        points.forEach(p => {
+            if(p.trim()) {
+                const li = document.createElement('li');
+                li.innerText = p;
+                pointsList.appendChild(li);
+            }
+        });
+
+        // 写真
+        const photoDiv = document.getElementById('p-photo');
+        if (loc['写真URL'] && loc['写真URL'].startsWith('http')) {
+            photoDiv.innerHTML = `<img src="${loc['写真URL']}" alt="現地写真">`;
+        } else {
+            photoDiv.innerHTML = '<p>写真なし</p>';
+        }
+
+        document.getElementById('confirm-btn').style.display = 'block';
+        document.getElementById('detail-panel').classList.add('active');
+    }
+
+    function hideDetail() {
+        document.getElementById('detail-panel').classList.remove('active');
+        selectedLocation = null;
+    }
+
+    async function confirmLocation() {
+        if (!selectedLocation) return;
+        
+        const btn = document.getElementById('confirm-btn');
+        btn.disabled = true;
+        btn.innerText = '送信中...';
+
+        try {
+            const payload = {
+                id: selectedLocation['ID'],
+                area: selectedLocation['エリア'],
+                name: selectedLocation['名称']
+            };
+
+            await fetch(GAS_URL, {
+                method: 'POST',
+                mode: 'no-cors', // GASへのPOSTはセキュリティ上no-corsが必要な場合が多い
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            alert('配置を記録しました。お疲れ様です！');
+            hideDetail();
+        } catch (error) {
+            alert('保存に失敗しました。');
+            console.error(error);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'ここに立つ（確定）';
+        }
+    }
+
+    window.onload = init;
+</script>
+
+</body>
+</html>
