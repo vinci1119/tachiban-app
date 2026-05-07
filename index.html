@@ -264,11 +264,21 @@
         });
 
         const photoDiv = document.getElementById('p-photo');
-        if (loc['写真URL'] && String(loc['写真URL']).startsWith('http')) {
-            photoDiv.innerHTML = `<img src="${loc['写真URL']}" alt="現地写真">`;
+        let photoUrl = String(loc['写真URL'] || '').trim();
+
+        if (photoUrl.startsWith('http')) {
+            // Googleドライブの標準リンクを、画像直リンク(uc?id=...)に自動変換する処理
+            const driveMatch = photoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (driveMatch && driveMatch[1]) {
+                photoUrl = `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+            }
+            // 読み込み中の表示が崩れないよう、画像の最大幅を指定
+            photoDiv.innerHTML = `<img src="${photoUrl}" alt="現地写真" style="max-width:100%; height:auto;">`;
         } else {
             photoDiv.innerHTML = '<p>写真なし</p>';
         }
+
+
 
         // ★選択中の場所に「青いピン」を重ねて表示
         if (activePin) map.removeLayer(activePin);
