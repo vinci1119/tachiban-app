@@ -50,6 +50,7 @@
         .btn-roppongi { background-color: var(--roppongi-color); }
         .btn-azabu { background-color: var(--azabu-color); }
 
+        /* 詳細パネル：コンパクト化 */
         #detail-panel {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: white; padding: 20px; border-radius: 20px 20px 0 0;
@@ -76,6 +77,7 @@
         }
         .point-list { padding-left: 20px; margin: 10px 0; line-height: 1.5; font-size: 0.95rem; }
 
+        /* 写真表示ボタンのスタイル */
         .btn-view-photo {
             width: 100%; padding: 10px; margin-bottom: 10px;
             background-color: #34495e; color: white;
@@ -83,6 +85,7 @@
             display: none; cursor: pointer;
         }
 
+        /* 写真モーダル（全画面オーバーレイ） */
         #photo-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); display: none;
@@ -132,6 +135,7 @@
         <button class="action-btn btn-roppongi" onclick="assignRandomly('六本木方面')">六本木方面<br><small>ランダム選択</small></button>
         <button class="action-btn btn-azabu" onclick="assignRandomly('麻布十番方面')">麻布十番方面<br><small>ランダム選択</small></button>
     </div>
+    <p style="margin:0; font-size:0.8rem; color:#666; text-align:center;">ピンをタップして手動で選ぶ・解除することもできます</p>
 </div>
 
 <div id="detail-panel">
@@ -261,22 +265,23 @@
             }
         });
 
-        // ★写真URLの処理（GitHub上の画像ファイル名に対応）
+        // ★修正：写真URLの処理（GitHubのファイル名にも対応）
         const photoBtn = document.getElementById('view-photo-btn');
         let photoUrl = String(loc['写真URL'] || '').trim();
         
-        if (photoUrl) {
+        if (photoUrl !== "") {
+            // 文字列が入っている場合はボタンを表示
             if (photoUrl.startsWith('http')) {
-                // Googleドライブ等へのフルリンクの場合
+                // Googleドライブのリンクの場合は自動変換
                 const driveMatch = photoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
                 if (driveMatch && driveMatch[1]) {
                     photoUrl = `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
                 }
             }
-            // URLが入っていれば（ファイル名だけでも）ボタンを表示
             currentPhotoUrl = photoUrl;
             photoBtn.style.display = 'block';
         } else {
+            // 空欄の場合はボタンを隠す
             currentPhotoUrl = "";
             photoBtn.style.display = 'none';
         }
@@ -303,7 +308,7 @@
         if (activePin) { map.removeLayer(activePin); activePin = null; }
     }
 
-    // ★修正：楽観的UI更新（待ち時間ゼロで画面を切り替える）
+    // ★追加：通信待ちをなくす「楽観的UI」ロジック
     function updateStatus(action) {
         if (!selectedLocation) return;
         
@@ -316,7 +321,7 @@
             locations[locIndex]['状態'] = (action === 'assign') ? '配置済み' : '';
         }
         hideDetail();     // パネルを閉じる
-        renderMarkers();  // マップのピン色を更新
+        renderMarkers();  // マップのピン色を即座に更新
 
         // 2. 裏でこっそりスプレッドシートに送信（ローディング画面は出さない）
         fetch(GAS_URL, {
@@ -325,7 +330,6 @@
         }).catch(err => console.error('バックグラウンド保存エラー'));
     }
 
-    // 全クリアは念のためローディング画面を残す
     async function clearAllLocations() {
         if (!confirm('全員の配置状況をリセットしますか？')) return;
         showLoading(true);
