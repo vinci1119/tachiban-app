@@ -8,7 +8,7 @@
     <style>
         :root {
             --primary-color: #007bff;
-            --assigned-color: #bdc1c6;
+            --assigned-color: #5f6368; /* 配置済みの色を濃いグレーに変更 */
             --bg-color: #f8f9fa;
         }
         body {
@@ -206,24 +206,25 @@
 
             const isAssigned = loc['状態'] === '配置済み';
             let color;
+            let fillOpac = 1.0; // 基本の透明度
             const radiusSize = 12;
 
             if (isAssigned) {
-                color = '#bdc1c6'; // 配置済みはGoogle Gray
+                color = '#5f6368'; // 配置済みは濃いグレーに変更
+                fillOpac = 0.4;    // さらに半透明にして背景に馴染ませる
             } else {
                 const priority = Number(loc['優先度']) || 3;
                 
-                // ★修正：エリア×優先度で「彩度」と「明度」を調整した色を割り当て
                 if (loc['エリア'] === '六本木方面') {
-                    // 六本木：赤系統 (HSL: Hue 0-5)
-                    color = (priority === 1) ? 'hsl(5, 80%, 50%)'  // 鮮やかな赤
-                          : (priority === 2) ? 'hsl(5, 55%, 75%)'  // 柔らかな赤
-                          : 'hsl(5, 30%, 90%)';                    // 淡いピンク
+                    // 六本木：赤系統
+                    color = (priority === 1) ? 'hsl(5, 80%, 50%)' 
+                          : (priority === 2) ? 'hsl(5, 55%, 75%)' 
+                          : 'hsl(5, 30%, 90%)';
                 } else {
-                    // 麻布十番：緑系統 (HSL: Hue 145)
-                    color = (priority === 1) ? 'hsl(145, 80%, 40%)' // 深い緑
-                          : (priority === 2) ? 'hsl(145, 50%, 70%)' // 明るい緑
-                          : 'hsl(145, 30%, 90%)';                   // 淡い緑
+                    // 麻布十番：緑系統
+                    color = (priority === 1) ? 'hsl(145, 80%, 40%)' 
+                          : (priority === 2) ? 'hsl(145, 50%, 70%)' 
+                          : 'hsl(145, 30%, 90%)';
                 }
             }
 
@@ -233,7 +234,7 @@
                 color: "#fff", 
                 weight: 1.5, 
                 opacity: 1, 
-                fillOpacity: 1.0 // 透明度は固定し、色の濃淡だけで表現
+                fillOpacity: fillOpac // 配置済みの時だけ半透明になる
             }).addTo(map);
 
             marker.on('click', () => showDetail(loc));
