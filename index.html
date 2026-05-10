@@ -8,9 +8,7 @@
     <style>
         :root {
             --primary-color: #007bff;
-            --roppongi-color: #e74c3c;
-            --azabu-color: #2ecc71;
-            --assigned-color: #7f8c8d;
+            --assigned-color: #bdc1c6;
             --bg-color: #f8f9fa;
         }
         body {
@@ -47,8 +45,8 @@
             cursor: pointer; transition: opacity 0.2s;
         }
         button.action-btn:active { opacity: 0.7; }
-        .btn-roppongi { background-color: var(--roppongi-color); }
-        .btn-azabu { background-color: var(--azabu-color); }
+        .btn-roppongi { background-color: #ea4335; }
+        .btn-azabu { background-color: #34a853; }
 
         #detail-panel {
             position: fixed; bottom: 0; left: 0; right: 0;
@@ -176,7 +174,6 @@
 
     function initMap() {
         map = L.map('map').setView([35.660982585197516, 139.73403123876028], 17);
-        
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
@@ -208,31 +205,35 @@
             if (isNaN(lat) || isNaN(lng)) return;
 
             const isAssigned = loc['状態'] === '配置済み';
-            let color, opacity;
-            const radiusSize = 12; // サイズ固定
+            let color;
+            const radiusSize = 12;
 
             if (isAssigned) {
-                color = '#7f8c8d'; 
-                opacity = 0.8;
+                color = '#bdc1c6'; // 配置済みはGoogle Gray
             } else {
                 const priority = Number(loc['優先度']) || 3;
                 
-                // ★エリアごとではなく、優先度順にGoogleカラーで色分け
-                if (priority === 1) {
-                    color = '#ea4335'; // 赤（最優先）
-                } else if (priority === 2) {
-                    color = '#fbbc04'; // 黄（優先）
+                // ★修正：エリア×優先度で「彩度」と「明度」を調整した色を割り当て
+                if (loc['エリア'] === '六本木方面') {
+                    // 六本木：赤系統 (HSL: Hue 0-5)
+                    color = (priority === 1) ? 'hsl(5, 80%, 50%)'  // 鮮やかな赤
+                          : (priority === 2) ? 'hsl(5, 55%, 75%)'  // 柔らかな赤
+                          : 'hsl(5, 30%, 90%)';                    // 淡いピンク
                 } else {
-                    color = '#4285f4'; // 青（準優先）
+                    // 麻布十番：緑系統 (HSL: Hue 145)
+                    color = (priority === 1) ? 'hsl(145, 80%, 40%)' // 深い緑
+                          : (priority === 2) ? 'hsl(145, 50%, 70%)' // 明るい緑
+                          : 'hsl(145, 30%, 90%)';                   // 淡い緑
                 }
-                
-                opacity = 0.9; // 色で識別できるため、透明度は統一してはっきり見せる
             }
 
             const marker = L.circleMarker([lat, lng], {
                 radius: radiusSize, 
                 fillColor: color, 
-                color: "#fff", weight: 2, opacity: 1, fillOpacity: opacity
+                color: "#fff", 
+                weight: 1.5, 
+                opacity: 1, 
+                fillOpacity: 1.0 // 透明度は固定し、色の濃淡だけで表現
             }).addTo(map);
 
             marker.on('click', () => showDetail(loc));
