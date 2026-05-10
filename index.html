@@ -175,7 +175,6 @@
     }
 
     function initMap() {
-        // 初期中心座標とズームレベルを維持
         map = L.map('map').setView([35.660982585197516, 139.73403123876028], 17);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -210,19 +209,24 @@
 
             const isAssigned = loc['状態'] === '配置済み';
             let color, opacity;
-            const radiusSize = 12; // ★サイズを12pxに固定（元に戻しました）
+            const radiusSize = 12; // サイズ固定
 
             if (isAssigned) {
                 color = '#7f8c8d'; 
                 opacity = 0.8;
             } else {
-                color = loc['エリア'] === '六本木方面' ? '#e74c3c' : '#2ecc71';
                 const priority = Number(loc['優先度']) || 3;
                 
-                // 濃淡（透明度）だけ残して優先度を表現
-                if (priority === 1) opacity = 1.0;
-                else if (priority === 2) opacity = 0.7;
-                else opacity = 0.4;
+                // ★エリアごとではなく、優先度順にGoogleカラーで色分け
+                if (priority === 1) {
+                    color = '#ea4335'; // 赤（最優先）
+                } else if (priority === 2) {
+                    color = '#fbbc04'; // 黄（優先）
+                } else {
+                    color = '#4285f4'; // 青（準優先）
+                }
+                
+                opacity = 0.9; // 色で識別できるため、透明度は統一してはっきり見せる
             }
 
             const marker = L.circleMarker([lat, lng], {
