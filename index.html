@@ -25,6 +25,14 @@
         }
         h1 { margin: 0; font-size: 1.1rem; }
         
+        .header-btns {
+            display: flex; gap: 8px;
+        }
+        .btn-refresh {
+            background-color: #3498db; color: white;
+            border: none; padding: 6px 12px; border-radius: 4px;
+            font-size: 0.8rem; cursor: pointer;
+        }
         .btn-clear-all {
             background-color: #e74c3c; color: white;
             border: none; padding: 6px 12px; border-radius: 4px;
@@ -126,7 +134,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* ★追加：凡例（アイコンの意味）用スタイル */
         #legend-panel {
             position: absolute; top: 10px; right: 10px;
             background: rgba(255, 255, 255, 0.95); border-radius: 8px;
@@ -159,7 +166,10 @@
 
 <header>
     <h1>朝の見守り配置</h1>
-    <button class="btn-clear-all" onclick="showClearModal()">全クリア</button>
+    <div class="header-btns">
+        <button class="btn-refresh" onclick="manualRefresh()">🔄 更新</button>
+        <button class="btn-clear-all" onclick="showClearModal()">全クリア</button>
+    </div>
 </header>
 
 <div id="map">
@@ -257,11 +267,12 @@
     async function init() {
         initMap();
         await fetchData();
+        // ★追加：30秒ごとに裏側で自動更新（画面操作の邪魔にならないように）
+        setInterval(silentFetchData, 30000);
     }
 
     function initMap() {
         map = L.map('map', {zoomControl: false}).setView([35.660982585197516, 139.73403123876028], 17);
-        // ズームコントロールの位置を左下に移動（右上の凡例と被らないようにするため）
         L.control.zoom({ position: 'bottomleft' }).addTo(map);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -270,7 +281,6 @@
         }).addTo(map);
     }
 
-    // ★追加：凡例の開閉処理
     function toggleLegend() {
         const content = document.getElementById('legend-content');
         const arrow = document.getElementById('legend-arrow');
@@ -283,6 +293,7 @@
         }
     }
 
+    // 初回や手動更新など、画面にローディングを出す取得処理
     async function fetchData() {
         showLoading(true);
         try {
@@ -296,10 +307,27 @@
         }
     }
 
+    // ★追加：裏側でこっそりデータを取得・反映する処理（ローディングを出さない）
+    async function silentFetchData() {
+        try {
+            const response = await fetch(GAS_URL);
+            locations = await response.json();
+            renderMarkers();
+        } catch (error) {
+            console.error('自動更新エラー', error);
+        }
+    }
+
+    // ★追加：ヘッダーの「更新」ボタンを押した時の処理
+    async function manualRefresh() {
+        hideDetail(); // 開いているパネルがあれば閉じる
+        await fetchData();
+    }
+
     function renderMarkers() {
         markers.forEach(m => map.removeLayer(m));
         markers = [];
-        if (activePin) { map.removeLayer(activePin); activePin = null; }
+        // ★修正：パネルが開いている場合、activePin（選択中の青ピン）を消さずに維持する
 
         locations.forEach(loc => {
             if (!loc['緯度'] || !loc['経度']) return;
