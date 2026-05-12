@@ -18,25 +18,19 @@
             display: flex; flex-direction: column; height: 100vh;
         }
         header {
-            background: #fff; padding: 10px 15px;
+            background: #fff; padding: 15px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex; justify-content: center; align-items: center; /* タイトルを中央寄りに */
             z-index: 1000;
         }
-        h1 { margin: 0; font-size: 1.1rem; }
-        
-        .header-btns {
-            display: flex; gap: 8px;
-        }
-        .btn-refresh {
-            background-color: #3498db; color: white;
-            border: none; padding: 6px 12px; border-radius: 4px;
-            font-size: 0.8rem; cursor: pointer;
-        }
-        .btn-clear-all {
-            background-color: #e74c3c; color: white;
-            border: none; padding: 6px 12px; border-radius: 4px;
-            font-size: 0.8rem; cursor: pointer;
+        /* タイトルを隠しボタン化（タップ時のハイライトを防ぐ設定を含む） */
+        h1 { 
+            margin: 0; 
+            font-size: 1.2rem; 
+            cursor: pointer; 
+            user-select: none; 
+            -webkit-user-select: none; 
+            -webkit-tap-highlight-color: transparent;
         }
 
         #map { flex-grow: 1; width: 100%; z-index: 1; position: relative; }
@@ -165,11 +159,7 @@
 </div>
 
 <header>
-    <h1>朝の見守り配置</h1>
-    <div class="header-btns">
-        <button class="btn-refresh" onclick="manualRefresh()">🔄 更新</button>
-        <button class="btn-clear-all" onclick="showClearModal()">全クリア</button>
-    </div>
+    <h1 onclick="showClearModal()">朝の見守り配置</h1>
 </header>
 
 <div id="map">
@@ -267,8 +257,7 @@
     async function init() {
         initMap();
         await fetchData();
-        // ★追加：30秒ごとに裏側で自動更新（画面操作の邪魔にならないように）
-        setInterval(silentFetchData, 30000);
+        setInterval(silentFetchData, 30000); // 30秒ごとに自動更新
     }
 
     function initMap() {
@@ -293,7 +282,6 @@
         }
     }
 
-    // 初回や手動更新など、画面にローディングを出す取得処理
     async function fetchData() {
         showLoading(true);
         try {
@@ -307,7 +295,6 @@
         }
     }
 
-    // ★追加：裏側でこっそりデータを取得・反映する処理（ローディングを出さない）
     async function silentFetchData() {
         try {
             const response = await fetch(GAS_URL);
@@ -318,16 +305,9 @@
         }
     }
 
-    // ★追加：ヘッダーの「更新」ボタンを押した時の処理
-    async function manualRefresh() {
-        hideDetail(); // 開いているパネルがあれば閉じる
-        await fetchData();
-    }
-
     function renderMarkers() {
         markers.forEach(m => map.removeLayer(m));
         markers = [];
-        // ★修正：パネルが開いている場合、activePin（選択中の青ピン）を消さずに維持する
 
         locations.forEach(loc => {
             if (!loc['緯度'] || !loc['経度']) return;
