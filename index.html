@@ -8,7 +8,7 @@
     <style>
         :root {
             --primary-color: #007bff;
-            --assigned-color: #5f6368; /* 配置済みの色を濃いグレーに変更 */
+            --assigned-color: #5f6368; 
             --bg-color: #f8f9fa;
         }
         body {
@@ -96,6 +96,23 @@
             color: white; font-size: 35px; font-weight: bold; cursor: pointer;
         }
 
+        /* ★追加：全クリア確認用専用モーダル */
+        #confirm-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); display: none;
+            align-items: center; justify-content: center; z-index: 4000;
+        }
+        .confirm-box {
+            background: white; padding: 25px; border-radius: 12px; width: 85%; max-width: 350px;
+            text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .confirm-box h3 { margin-top: 0; color: #e74c3c; font-size: 1.2rem; }
+        .confirm-box p { margin-bottom: 20px; font-size: 0.95rem; color: #333; line-height: 1.4; }
+        .confirm-btns { display: flex; gap: 10px; }
+        .confirm-btns button { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        .btn-cancel-clear { background: #95a5a6; color: white; }
+        .btn-execute-clear { background: #e74c3c; color: white; }
+
         .btn-confirm { background-color: var(--primary-color); width: 100%; margin-top: 5px; display: none; }
         .btn-cancel { background-color: #95a5a6; width: 100%; margin-top: 5px; display: none; }
 
@@ -115,12 +132,12 @@
 
 <div id="loading">
     <div class="spinner"></div>
-    <p>最新の配置データを取得中...</p>
+    <p>通信中...</p>
 </div>
 
 <header>
     <h1>朝の見守り配置</h1>
-    <button class="btn-clear-all" onclick="clearAllLocations()">全クリア</button>
+    <button class="btn-clear-all" onclick="showClearModal()">全クリア</button>
 </header>
 
 <div id="map"></div>
@@ -155,6 +172,17 @@
 <div id="photo-modal" onclick="closePhotoModal()">
     <span class="modal-close">&times;</span>
     <img id="modal-img" src="" alt="現地写真">
+</div>
+
+<div id="confirm-modal">
+    <div class="confirm-box">
+        <h3>⚠️ 全クリアの確認</h3>
+        <p>本当に全員の配置状況をリセットしますか？<br>この操作は取り消せません。</p>
+        <div class="confirm-btns">
+            <button class="btn-cancel-clear" onclick="hideClearModal()">キャンセル</button>
+            <button class="btn-execute-clear" onclick="executeClearAll()">リセットする</button>
+        </div>
+    </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -206,22 +234,20 @@
 
             const isAssigned = loc['状態'] === '配置済み';
             let color;
-            let fillOpac = 1.0; // 基本の透明度
+            let fillOpac = 1.0; 
             const radiusSize = 12;
 
             if (isAssigned) {
-                color = '#5f6368'; // 配置済みは濃いグレーに変更
-                fillOpac = 0.4;    // さらに半透明にして背景に馴染ませる
+                color = '#5f6368'; 
+                fillOpac = 0.4;    
             } else {
                 const priority = Number(loc['優先度']) || 3;
                 
                 if (loc['エリア'] === '六本木方面') {
-                    // 六本木：赤系統
                     color = (priority === 1) ? 'hsl(5, 80%, 50%)' 
                           : (priority === 2) ? 'hsl(5, 55%, 75%)' 
                           : 'hsl(5, 30%, 90%)';
                 } else {
-                    // 麻布十番：緑系統
                     color = (priority === 1) ? 'hsl(145, 80%, 40%)' 
                           : (priority === 2) ? 'hsl(145, 50%, 70%)' 
                           : 'hsl(145, 30%, 90%)';
@@ -234,7 +260,7 @@
                 color: "#fff", 
                 weight: 1.5, 
                 opacity: 1, 
-                fillOpacity: fillOpac // 配置済みの時だけ半透明になる
+                fillOpacity: fillOpac
             }).addTo(map);
 
             marker.on('click', () => showDetail(loc));
@@ -315,26 +341,44 @@
         if (activePin) { map.removeLayer(activePin); activePin = null; }
     }
 
-    function updateStatus(action) {
+    // ★修正：「ここに立つ」を押したら、通信完了して最新データを取得するまで画面をロックする
+    async function updateStatus(action) {
         if (!selectedLocation) return;
+        showLoading(true); // 通信中画面を出す
+        
         const targetId = selectedLocation['ID'];
         const payload = { action: action, id: targetId, area: selectedLocation['エリア'], name: selectedLocation['名称'] };
 
-        const locIndex = locations.findIndex(l => l['ID'] === targetId);
-        if (locIndex !== -1) {
-            locations[locIndex]['状態'] = (action === 'assign') ? '配置済み' : '';
+        try {
+            // スプレッドシートに書き込み
+            await fetch(GAS_URL, {
+                method: 'POST', mode: 'no-cors',
+                body: JSON.stringify(payload)
+            });
+            
+            // 詳細パネルを閉じて、最新の全員の配置状況を読み込み直す
+            hideDetail();
+            await fetchData(); 
+            
+        } catch(err) {
+            console.error('保存エラー', err);
+            alert('通信エラーが発生しました。');
+            showLoading(false);
         }
-        hideDetail();
-        renderMarkers();
-
-        fetch(GAS_URL, {
-            method: 'POST', mode: 'no-cors',
-            body: JSON.stringify(payload)
-        }).catch(err => console.error('バックグラウンド保存エラー'));
     }
 
-    async function clearAllLocations() {
-        if (!confirm('全員の配置状況をリセットしますか？')) return;
+    // ★追加：全クリア用のモーダル制御関数
+    function showClearModal() {
+        document.getElementById('confirm-modal').style.display = 'flex';
+    }
+
+    function hideClearModal() {
+        document.getElementById('confirm-modal').style.display = 'none';
+    }
+
+    // ★修正：全クリア実行時も、完了するまでローディングを出す
+    async function executeClearAll() {
+        hideClearModal(); // モーダルを閉じる
         showLoading(true);
         try {
             await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'clearAll' }) });
